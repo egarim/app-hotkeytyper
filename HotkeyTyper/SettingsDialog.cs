@@ -37,8 +37,8 @@ public class SettingsDialog : Form
     private void InitializeComponent()
     {
         this.Text = "Settings";
-        this.Size = new Size(600, 650);
-        this.MinimumSize = new Size(550, 580);
+        this.Size = new Size(825, 650);
+        this.MinimumSize = new Size(770, 580);
         this.FormBorderStyle = FormBorderStyle.Sizable;
         this.StartPosition = FormStartPosition.CenterParent;
         this.MaximizeBox = false;
