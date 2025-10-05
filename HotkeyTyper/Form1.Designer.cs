@@ -25,11 +25,13 @@ partial class Form1
         
         // Form properties
         AutoScaleMode = AutoScaleMode.Font;
-    ClientSize = new Size(500, 540); // Increased further to prevent clipping after additional downward shifts
+        ClientSize = new Size(600, 650); // Increased size for better layout
+        MinimumSize = new Size(550, 600);
         Text = "Hotkey Typer - CTRL+SHIFT+1 to Type Text";
         StartPosition = FormStartPosition.CenterScreen;
-        MaximizeBox = false;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = true;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        Padding = new Padding(15); // Add padding around the form
         
         // Create controls
         CreateControls();
@@ -37,170 +39,231 @@ partial class Form1
     
     private void CreateControls()
     {
-        // Label for instructions
+        // Create main layout panel
+        var mainLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 7,
+            Padding = new Padding(5),
+            AutoSize = true
+        };
+        
+        // Configure row styles
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Instructions
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Text box (expandable)
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Typing speed controls
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Checkboxes
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // File path
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Buttons
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Status
+        
+        // Row 0: Instructions Label
         var lblInstructions = new Label
         {
             Text = "Configure your predefined text below.\nPress CTRL+SHIFT+1 anywhere to type it:",
-            Location = new Point(20, 20),
-            // Increased height to ensure second line isn't clipped on various DPI scales
-            Size = new Size(460, 55),
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular)
+            AutoSize = true,
+            Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+            Margin = new Padding(0, 0, 0, 10),
+            Dock = DockStyle.Top
         };
         
-        // TextBox for predefined text
+        // Row 1: TextBox for predefined text
         var txtPredefinedText = new TextBox
         {
             Name = "txtPredefinedText",
-            Text = predefinedText, // This will show the loaded text
-            // Shifted down slightly to keep spacing after taller instructions label
-            Location = new Point(20, 85),
-            Size = new Size(460, 135), // Increased by 50% from 90 to 135
+            Text = predefinedText,
             Multiline = true,
             ScrollBars = ScrollBars.Vertical,
-            Font = new Font("Segoe UI", 9F)
+            Font = new Font("Segoe UI", 9F),
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 0, 15)
         };
         
-        // Typing speed label
+        // Row 2: Typing speed controls panel
+        var speedPanel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0, 0, 0, 15)
+        };
+        
         var lblTypingSpeed = new Label
         {
             Text = "Typing Speed:",
-            Location = new Point(20, 230),
-            Size = new Size(80, 20),
-            Font = new Font("Segoe UI", 9F)
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9F),
+            Margin = new Padding(0, 5, 10, 0),
+            TextAlign = ContentAlignment.MiddleLeft
         };
         
-        // Typing speed slider (custom for soft limit visuals)
         var sliderTypingSpeed = new LimitedTrackBar
         {
             Name = "sliderTypingSpeed",
-            Location = new Point(105, 225),
-            Size = new Size(200, 45),
+            Width = 220,
+            Height = 45,
             Minimum = 1,
             Maximum = 10,
             Value = typingSpeed,
             TickFrequency = 1,
             TickStyle = TickStyle.None,
-            SoftMax = hasCodeMode ? 8 : null
+            SoftMax = hasCodeMode ? 8 : null,
+            Margin = new Padding(0, 0, 10, 0)
         };
         sliderTypingSpeed.ValueChanged += TypingSpeedSlider_ValueChanged;
         
-        // Speed indicator label
         var lblSpeedIndicator = new Label
         {
             Name = "lblSpeedIndicator",
-            Text = "Normal", // Default value, will be updated after load
-            Location = new Point(315, 230),
-            Size = new Size(100, 20),
-            Font = new Font("Segoe UI", 9F, FontStyle.Italic)
+            Text = "Normal",
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            Margin = new Padding(0, 5, 0, 0),
+            TextAlign = ContentAlignment.MiddleLeft
         };
-
-        // Checkbox: Has Code (limits speed)
+        
+        speedPanel.Controls.AddRange(new Control[] { lblTypingSpeed, sliderTypingSpeed, lblSpeedIndicator });
+        
+        // Row 3: Checkboxes panel
+        var checkboxPanel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        
         var chkHasCode = new CheckBox
         {
             Name = "chkHasCode",
             Text = "Has Code (limit speed)",
-            Location = new Point(20, 290), // Further down to avoid any overlap/cutoff
-            Size = new Size(180, 20),
+            AutoSize = true,
             Checked = hasCodeMode,
-            Font = new Font("Segoe UI", 9F)
+            Font = new Font("Segoe UI", 9F),
+            Margin = new Padding(0, 0, 20, 0)
         };
         chkHasCode.CheckedChanged += ChkHasCode_CheckedChanged;
-
-        // Use file checkbox
+        
         var chkUseFile = new CheckBox
         {
             Name = "chkUseFile",
             Text = "Use File (.md/.txt)",
-            Location = new Point(220, 290), // Align with Has Code new Y
-            Size = new Size(150, 20),
+            AutoSize = true,
             Checked = false,
             Font = new Font("Segoe UI", 9F)
         };
         chkUseFile.CheckedChanged += ChkUseFile_CheckedChanged;
-
-        // File path textbox
+        
+        checkboxPanel.Controls.AddRange(new Control[] { chkHasCode, chkUseFile });
+        
+        // Row 4: File path panel
+        var filePanel = new TableLayoutPanel
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0, 0, 0, 15)
+        };
+        filePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        filePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        
         var txtFilePath = new TextBox
         {
             Name = "txtFilePath",
-            Location = new Point(20, 320), // Shifted down to maintain spacing under checkboxes
-            Size = new Size(370, 23),
             Text = string.Empty,
             Enabled = false,
             ReadOnly = true,
-            Font = new Font("Segoe UI", 9F)
+            Font = new Font("Segoe UI", 9F),
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 10, 0)
         };
-
-        // Browse button
+        
         var btnBrowseFile = new Button
         {
             Name = "btnBrowseFile",
             Text = "Browse…",
-            Location = new Point(400, 318), // Align with file path new Y
-            Size = new Size(80, 26),
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Enabled = false,
-            Font = new Font("Segoe UI", 9F)
+            Font = new Font("Segoe UI", 9F),
+            Padding = new Padding(15, 5, 15, 5)
         };
         btnBrowseFile.Click += BtnBrowseFile_Click;
         
-        // Button to update text
+        filePanel.Controls.Add(txtFilePath, 0, 0);
+        filePanel.Controls.Add(btnBrowseFile, 1, 0);
+        
+        // Row 5: Buttons panel
+        var buttonPanel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            Margin = new Padding(0, 0, 0, 15)
+        };
+        
         var btnUpdate = new Button
         {
             Text = "Save",
-            Location = new Point(20, 355), // Shifted further down
-            Size = new Size(100, 30),
-            Font = new Font("Segoe UI", 9F)
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Font = new Font("Segoe UI", 9F),
+            Padding = new Padding(20, 8, 20, 8),
+            Margin = new Padding(0, 0, 10, 0)
         };
         btnUpdate.Click += BtnUpdate_Click;
         
-        // Minimize to tray button
         var btnMinimize = new Button
         {
             Text = "Minimize to Tray",
-            Location = new Point(20, 395), // Shifted down with rest
-            // Widened to avoid text clipping on 125%/150% DPI
-            Size = new Size(150, 30),
-            Font = new Font("Segoe UI", 9F)
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Font = new Font("Segoe UI", 9F),
+            Padding = new Padding(20, 8, 20, 8),
+            Margin = new Padding(0, 0, 10, 0)
         };
         btnMinimize.Click += BtnMinimize_Click;
-
-        // Stop typing button (placed under the minimize button)
+        
         var btnStop = new Button
         {
             Name = "btnStop",
             Text = "Stop Typing",
-            Location = new Point(20, 435), // Shifted down to maintain spacing
-            Size = new Size(150, 30),
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Font = new Font("Segoe UI", 9F),
-            Enabled = false // Enabled only while typing is in progress
+            Padding = new Padding(20, 8, 20, 8),
+            Enabled = false
         };
         btnStop.Click += BtnStop_Click;
         
-        // Status label
+        buttonPanel.Controls.AddRange(new Control[] { btnUpdate, btnMinimize, btnStop });
+        
+        // Row 6: Status label
         var lblStatus = new Label
         {
             Text = "Status: Hotkey CTRL+SHIFT+1 is active",
-            Location = new Point(150, 370), // Repositioned for new layout
-            Size = new Size(320, 20),
+            AutoSize = true,
             Font = new Font("Segoe UI", 9F),
-            ForeColor = Color.Green
+            ForeColor = Color.Green,
+            Dock = DockStyle.Fill
         };
         
-        // Add controls to form
-        Controls.AddRange(new Control[] { 
-            lblInstructions, 
-            txtPredefinedText, 
-            lblTypingSpeed,
-            sliderTypingSpeed,
-            lblSpeedIndicator,
-            chkHasCode,
-            chkUseFile,
-            txtFilePath,
-            btnBrowseFile,
-            btnUpdate, 
-            btnMinimize,
-            btnStop,
-            lblStatus
-        });
+        // Add all rows to main layout
+        mainLayout.Controls.Add(lblInstructions, 0, 0);
+        mainLayout.Controls.Add(txtPredefinedText, 0, 1);
+        mainLayout.Controls.Add(speedPanel, 0, 2);
+        mainLayout.Controls.Add(checkboxPanel, 0, 3);
+        mainLayout.Controls.Add(filePanel, 0, 4);
+        mainLayout.Controls.Add(buttonPanel, 0, 5);
+        mainLayout.Controls.Add(lblStatus, 0, 6);
+        
+        // Add main layout to form
+        Controls.Add(mainLayout);
         
         // Store references for later use
         this.txtPredefinedText = txtPredefinedText;
