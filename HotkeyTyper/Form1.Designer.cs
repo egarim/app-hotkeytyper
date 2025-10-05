@@ -250,10 +250,10 @@ partial class Form1
             Tag = set
         };
         
-        listViewSnippets.Columns.Add("Hotkey", 100);
-        listViewSnippets.Columns.Add("Name", 200);
-        listViewSnippets.Columns.Add("Speed", 80);
-        listViewSnippets.Columns.Add("Preview", -2); // -2 = auto-fill remaining space
+        listViewSnippets.Columns.Add("Hotkey", 70);
+        listViewSnippets.Columns.Add("Name", 120);
+        listViewSnippets.Columns.Add("Speed", 60);
+        listViewSnippets.Columns.Add("Preview", 1000); // Large width to fill remaining space
         listViewSnippets.SelectedIndexChanged += ListViewSnippets_SelectedIndexChanged;
         
         // Populate snippets
