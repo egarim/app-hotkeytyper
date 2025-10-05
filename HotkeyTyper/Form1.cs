@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using HotkeyTyper.Models;
+using HotkeyTyper.Managers;
 
 namespace HotkeyTyper;
 
@@ -11,7 +13,13 @@ public partial class Form1 : Form
     private const int WM_HOTKEY = 0x0312;
     private const int HOTKEY_ID = 1;
     
-    // Settings file path
+    // NEW: Settings Manager and Configuration
+    private SettingsManager settingsManager;
+    private AppConfiguration appConfig;
+    private SnippetSet? currentSet;
+    private Snippet? currentSnippet;
+    
+    // Settings file path (OLD - for backward compatibility during migration)
     private readonly string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
     
     // Predefined text to type
@@ -59,9 +67,13 @@ public partial class Form1 : Form
 
     public Form1()
     {
+        // Initialize Settings Manager and load configuration
+        settingsManager = new SettingsManager();
+        appConfig = settingsManager.LoadSettings();
+        
         InitializeComponent();
         InitializeSystemTray();
-        LoadSettings();
+        LoadSettings(); // Load old format for backward compatibility
         // NOTE: Global hotkey registration is now handled in OnHandleCreated so that
         // it is automatically re-registered if the window handle is recreated (e.g.
         // when toggling ShowInTaskbar while minimizing to tray). Previously the hotkey
@@ -75,6 +87,48 @@ public partial class Form1 : Form
     private void Form1_Load(object? sender, EventArgs e)
     {
         UpdateUIFromSettings();
+        LoadSetsIntoTabs();
+    }
+    
+    private void LoadSetsIntoTabs()
+    {
+        tabControlSets.TabPages.Clear();
+        
+        foreach (var set in appConfig.Sets)
+        {
+            var tabPage = CreateSetTabPage(set);
+            tabControlSets.TabPages.Add(tabPage);
+        }
+        
+        // Select active set
+        if (!string.IsNullOrEmpty(appConfig.ActiveSetId))
+        {
+            var activeSet = appConfig.GetActiveSet();
+            if (activeSet != null)
+            {
+                for (int i = 0; i < tabControlSets.TabPages.Count; i++)
+                {
+                    if (tabControlSets.TabPages[i].Tag == activeSet)
+                    {
+                        tabControlSets.SelectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        else if (tabControlSets.TabPages.Count > 0)
+        {
+            tabControlSets.SelectedIndex = 0;
+        }
+        
+        UpdateSetButtons();
+    }
+    
+    private void UpdateSetButtons()
+    {
+        bool hasSelection = tabControlSets.SelectedTab != null;
+        btnRenameSet.Enabled = hasSelection;
+        btnDeleteSet.Enabled = hasSelection && appConfig.Sets.Count > 1;
     }
     
     private void UpdateUIFromSettings()
@@ -598,6 +652,264 @@ public partial class Form1 : Form
             if (btnStop != null)
             {
                 btnStop.Enabled = false;
+            }
+        }
+    }
+    
+    private void SliderTypingSpeed_ValueChanged(object? sender, EventArgs e)
+    {
+        if (sliderTypingSpeed == null || lblSpeedIndicator == null) return;
+        
+        int speed = sliderTypingSpeed.Value;
+        lblSpeedIndicator.Text = GetSpeedText(speed);
+    }
+    
+    // ===== SET MANAGEMENT EVENT HANDLERS =====
+    
+    // ===== TAB CONTROL EVENT HANDLERS =====
+    
+    private void TabControlSets_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (tabControlSets.SelectedTab?.Tag is SnippetSet selectedSet)
+        {
+            currentSet = selectedSet;
+            appConfig.SetActiveSet(selectedSet.Id);
+            settingsManager.SaveSettings(appConfig);
+            UpdateSetButtons();
+        }
+    }
+    
+    private void BtnNewSet_Click(object? sender, EventArgs e)
+    {
+        string? setName = Microsoft.VisualBasic.Interaction.InputBox(
+            "Enter a name for the new snippet set:",
+            "New Snippet Set",
+            "New Set");
+            
+        if (!string.IsNullOrWhiteSpace(setName))
+        {
+            var newSet = new SnippetSet
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = setName,
+                Description = "",
+                Snippets = new List<Snippet>()
+            };
+            
+            appConfig.Sets.Add(newSet);
+            settingsManager.SaveSettings(appConfig);
+            
+            var tabPage = CreateSetTabPage(newSet);
+            tabControlSets.TabPages.Add(tabPage);
+            tabControlSets.SelectedTab = tabPage;
+        }
+    }
+    
+    private void BtnRenameSet_Click(object? sender, EventArgs e)
+    {
+        if (tabControlSets.SelectedTab?.Tag is not SnippetSet selectedSet) return;
+        
+        string? newName = Microsoft.VisualBasic.Interaction.InputBox(
+            "Enter a new name for this snippet set:",
+            "Rename Snippet Set",
+            selectedSet.Name);
+            
+        if (!string.IsNullOrWhiteSpace(newName) && newName != selectedSet.Name)
+        {
+            selectedSet.Name = newName;
+            tabControlSets.SelectedTab.Text = newName;
+            settingsManager.SaveSettings(appConfig);
+        }
+    }
+    
+    private void BtnDeleteSet_Click(object? sender, EventArgs e)
+    {
+        if (tabControlSets.SelectedTab?.Tag is not SnippetSet selectedSet) return;
+        
+        if (appConfig.Sets.Count <= 1)
+        {
+            MessageBox.Show("Cannot delete the last remaining set.", "Delete Set", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        
+        var result = MessageBox.Show(
+            $"Are you sure you want to delete the set '{selectedSet.Name}' and all its snippets?",
+            "Delete Snippet Set",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+            
+        if (result == DialogResult.Yes)
+        {
+            appConfig.Sets.Remove(selectedSet);
+            settingsManager.SaveSettings(appConfig);
+            tabControlSets.TabPages.Remove(tabControlSets.SelectedTab);
+        }
+    }
+    
+    // ===== SNIPPET EVENT HANDLERS =====
+    
+    private void ListViewSnippets_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (sender is not ListView listView) return;
+        if (listView.SelectedItems.Count == 0)
+        {
+            currentSnippet = null;
+            EnableEditorControls(false);
+            return;
+        }
+        
+        if (listView.SelectedItems[0].Tag is Snippet selectedSnippet)
+        {
+            currentSnippet = selectedSnippet;
+            currentSet = listView.Tag as SnippetSet;
+            LoadSnippetIntoEditor();
+            EnableEditorControls(true);
+        }
+    }
+    
+    private void LoadSnippetIntoEditor()
+    {
+        if (currentSnippet == null) return;
+        
+        txtSnippetName.Text = currentSnippet.Name;
+        txtPredefinedText.Text = currentSnippet.Content;
+        sliderTypingSpeed.Value = currentSnippet.TypingSpeed;
+        chkHasCode.Checked = currentSnippet.HasCode;
+        chkUseFile.Checked = currentSnippet.UseFile;
+        txtFilePath.Text = currentSnippet.FilePath ?? "";
+        lblHotkeyDisplay.Text = $"Hotkey: {currentSnippet.GetHotkeyDisplay()}";
+        
+        lblStatus.Text = $"Status: Editing snippet '{currentSnippet.Name}'";
+        lblStatus.ForeColor = Color.Blue;
+    }
+    
+    private void EnableEditorControls(bool enabled)
+    {
+        txtSnippetName.Enabled = enabled;
+        txtPredefinedText.Enabled = enabled;
+        sliderTypingSpeed.Enabled = enabled;
+        chkHasCode.Enabled = enabled;
+        chkUseFile.Enabled = enabled;
+        txtFilePath.Enabled = enabled && chkUseFile.Checked;
+        btnBrowseFile.Enabled = enabled && chkUseFile.Checked;
+        btnSaveSnippet.Enabled = enabled;
+        btnDeleteSnippet.Enabled = enabled;
+    }
+    
+    private void BtnNewSnippet_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button button) return;
+        if (button.Tag is not SnippetSet targetSet) return;
+        
+        var availableHotkeys = targetSet.GetAvailableHotkeys();
+        if (availableHotkeys.Count == 0)
+        {
+            MessageBox.Show("This set already has 9 snippets (maximum allowed).", "New Snippet", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        
+        string? snippetName = Microsoft.VisualBasic.Interaction.InputBox(
+            "Enter a name for the new snippet:",
+            "New Snippet",
+            "New Snippet");
+            
+        if (!string.IsNullOrWhiteSpace(snippetName))
+        {
+            var newSnippet = new Snippet
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = snippetName,
+                Content = "",
+                HotkeyNumber = availableHotkeys[0],
+                TypingSpeed = 5
+            };
+            
+            targetSet.AddSnippet(newSnippet);
+            settingsManager.SaveSettings(appConfig);
+            
+            // Refresh the tab to show new snippet
+            RefreshActiveTab();
+        }
+    }
+    
+    private void BtnDeleteSnippet_Click(object? sender, EventArgs e)
+    {
+        if (currentSnippet == null || currentSet == null) return;
+        
+        var result = MessageBox.Show(
+            $"Are you sure you want to delete the snippet '{currentSnippet.Name}'?",
+            "Delete Snippet",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+            
+        if (result == DialogResult.Yes)
+        {
+            currentSet.RemoveSnippet(currentSnippet.Id);
+            settingsManager.SaveSettings(appConfig);
+            
+            currentSnippet = null;
+            EnableEditorControls(false);
+            
+            // Refresh the tab
+            RefreshActiveTab();
+        }
+    }
+    
+    private void BtnSaveSnippet_Click(object? sender, EventArgs e)
+    {
+        if (currentSnippet == null) return;
+        
+        // Validate snippet name
+        if (string.IsNullOrWhiteSpace(txtSnippetName.Text))
+        {
+            MessageBox.Show("Snippet name cannot be empty.", "Save Snippet", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        
+        // Update snippet from editor
+        currentSnippet.Name = txtSnippetName.Text.Trim();
+        currentSnippet.Content = txtPredefinedText.Text;
+        currentSnippet.TypingSpeed = sliderTypingSpeed.Value;
+        currentSnippet.HasCode = chkHasCode.Checked;
+        currentSnippet.UseFile = chkUseFile.Checked;
+        currentSnippet.FilePath = chkUseFile.Checked ? txtFilePath.Text : null;
+        
+        settingsManager.SaveSettings(appConfig);
+        
+        // Refresh the tab to show updated snippet
+        RefreshActiveTab();
+        
+        lblStatus.Text = $"Status: Snippet '{currentSnippet.Name}' saved successfully";
+        lblStatus.ForeColor = Color.Green;
+    }
+    
+    private void RefreshActiveTab()
+    {
+        if (tabControlSets.SelectedTab?.Tag is not SnippetSet selectedSet) return;
+        
+        int selectedIndex = tabControlSets.SelectedIndex;
+        string? selectedSnippetId = currentSnippet?.Id;
+        
+        // Recreate tab
+        tabControlSets.TabPages.RemoveAt(selectedIndex);
+        var newTab = CreateSetTabPage(selectedSet);
+        tabControlSets.TabPages.Insert(selectedIndex, newTab);
+        tabControlSets.SelectedIndex = selectedIndex;
+        
+        // Reselect snippet if we had one
+        if (selectedSnippetId != null)
+        {
+            var listView = newTab.Controls[0].Controls.OfType<ListView>().FirstOrDefault();
+            if (listView != null)
+            {
+                for (int i = 0; i < listView.Items.Count; i++)
+                {
+                    if (listView.Items[i].Tag is Snippet snippet && snippet.Id == selectedSnippetId)
+                    {
+                        listView.Items[i].Selected = true;
+                        break;
+                    }
+                }
             }
         }
     }
