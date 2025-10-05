@@ -993,13 +993,15 @@ public partial class Form1 : Form
         
         // Handle auto-save mode
         bool autoSaveEnabled = appConfig.UISettings.AutoSave;
-        if (autoSaveEnabled && enabled)
+        if (autoSaveEnabled)
         {
+            // When auto-save is enabled, always show the auto-save text and keep button disabled
             btnSaveSnippet.Enabled = false;
             btnSaveSnippet.Text = "✓ Auto Save";
         }
         else
         {
+            // Normal mode: enable/disable based on whether a snippet is selected
             btnSaveSnippet.Enabled = enabled;
             btnSaveSnippet.Text = "💾 Save";
         }
