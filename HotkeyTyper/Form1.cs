@@ -746,8 +746,49 @@ public partial class Form1 : Form
         
         settingsManager.SaveSettings(appConfig);
         
+        // Update the ListView to reflect the changes
+        UpdateListViewItem(currentSnippet);
+        
         lblStatus.Text = $"Status: Auto-saved '{currentSnippet.Name}'";
         lblStatus.ForeColor = Color.Green;
+    }
+    
+    private void UpdateListViewItem(Snippet snippet)
+    {
+        // Find the ListView in the active tab
+        if (tabControlSets.SelectedTab == null) return;
+        
+        ListView? listView = null;
+        foreach (Control control in tabControlSets.SelectedTab.Controls)
+        {
+            if (control is TableLayoutPanel tableLayout)
+            {
+                foreach (Control child in tableLayout.Controls)
+                {
+                    if (child is ListView lv)
+                    {
+                        listView = lv;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (listView == null) return;
+        
+        // Find the ListViewItem for this snippet
+        foreach (ListViewItem item in listView.Items)
+        {
+            if (item.Tag == snippet)
+            {
+                // Update the item's display
+                item.SubItems[0].Text = snippet.GetHotkeyDisplay();
+                item.SubItems[1].Text = snippet.Name;
+                item.SubItems[2].Text = GetSpeedText(snippet.TypingSpeed);
+                item.SubItems[3].Text = snippet.GetContentPreview();
+                break;
+            }
+        }
     }
     
     private void TxtSnippetName_TextChanged(object? sender, EventArgs e)
