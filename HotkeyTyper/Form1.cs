@@ -891,42 +891,97 @@ public partial class Form1 : Form
     private void BtnSettings_Click(object? sender, EventArgs e)
     {
         var settingsDialog = new SettingsDialog(appConfig.UISettings);
-        if (settingsDialog.ShowDialog(this) == DialogResult.OK && settingsDialog.Applied)
+        if (settingsDialog.ShowDialog(this) == DialogResult.OK)
         {
-            // Copy the modified settings back to appConfig
-            appConfig.UISettings.Scale = settingsDialog.UISettings.Scale;
-            appConfig.UISettings.BaseFontSize = settingsDialog.UISettings.BaseFontSize;
-            appConfig.UISettings.ContentFontSize = settingsDialog.UISettings.ContentFontSize;
-            appConfig.UISettings.AutoSave = settingsDialog.UISettings.AutoSave;
-            
-            // Save settings
-            settingsManager.SaveSettings(appConfig);
-            
-            // Refresh editor controls to reflect auto-save setting immediately
-            EnableEditorControls(currentSnippet != null);
-            
-            // Apply UI scale changes
-            ApplyUIScale(appConfig.UISettings);
-            
-            // Show feedback about auto-save status
-            if (appConfig.UISettings.AutoSave)
+            // Check if reset was requested
+            if (settingsDialog.ResetRequested)
             {
-                lblStatus.Text = "Status: Auto-save enabled - changes will be saved automatically";
-                lblStatus.ForeColor = Color.Green;
-            }
-            else
-            {
-                lblStatus.Text = "Status: Auto-save disabled - use Save button to save changes";
-                lblStatus.ForeColor = Color.Blue;
+                ResetToDefault();
+                return;
             }
             
-            // Show message about restart for complete UI refresh (only if needed for fonts/scale)
-            MessageBox.Show(
-                "Settings have been saved and applied.\n\nNote: Some UI changes may require an application restart to fully take effect.",
-                "Settings Saved",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            if (settingsDialog.Applied)
+            {
+                // Copy the modified settings back to appConfig
+                appConfig.UISettings.Scale = settingsDialog.UISettings.Scale;
+                appConfig.UISettings.BaseFontSize = settingsDialog.UISettings.BaseFontSize;
+                appConfig.UISettings.ContentFontSize = settingsDialog.UISettings.ContentFontSize;
+                appConfig.UISettings.AutoSave = settingsDialog.UISettings.AutoSave;
+                
+                // Save settings
+                settingsManager.SaveSettings(appConfig);
+                
+                // Refresh editor controls to reflect auto-save setting immediately
+                EnableEditorControls(currentSnippet != null);
+                
+                // Apply UI scale changes
+                ApplyUIScale(appConfig.UISettings);
+                
+                // Show feedback about auto-save status
+                if (appConfig.UISettings.AutoSave)
+                {
+                    lblStatus.Text = "Status: Auto-save enabled - changes will be saved automatically";
+                    lblStatus.ForeColor = Color.Green;
+                }
+                else
+                {
+                    lblStatus.Text = "Status: Auto-save disabled - use Save button to save changes";
+                    lblStatus.ForeColor = Color.Blue;
+                }
+                
+                // Show message about restart for complete UI refresh (only if needed for fonts/scale)
+                MessageBox.Show(
+                    "Settings have been saved and applied.\n\nNote: Some UI changes may require an application restart to fully take effect.",
+                    "Settings Saved",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
         }
+    }
+    
+    private void ResetToDefault()
+    {
+        // Create a new default configuration
+        appConfig = new AppConfiguration();
+        appConfig.Sets.Add(new SnippetSet
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "Default",
+            Description = "Your first snippet set",
+            Snippets = new List<Snippet>
+            {
+                new Snippet
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = "Sample Snippet",
+                    Content = "Hello, this is a sample snippet!\nEdit this to get started.",
+                    HotkeyNumber = 1,
+                    TypingSpeed = 5
+                }
+            }
+        });
+        appConfig.ActiveSetId = appConfig.Sets[0].Id;
+        
+        // Save the new default configuration
+        settingsManager.SaveSettings(appConfig);
+        
+        // Clear the current snippet
+        currentSnippet = null;
+        currentSet = null;
+        
+        // Reload the UI
+        LoadSetsIntoTabs();
+        EnableEditorControls(false);
+        
+        lblStatus.Text = "Status: Application reset to default. All previous data has been deleted.";
+        lblStatus.ForeColor = Color.Green;
+        
+        MessageBox.Show(
+            "✅ Application has been reset to default state.\n\n" +
+            "All previous snippet sets have been deleted and a new default set has been created.",
+            "Reset Complete",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
     }
     
     // ===== SNIPPET EVENT HANDLERS =====
