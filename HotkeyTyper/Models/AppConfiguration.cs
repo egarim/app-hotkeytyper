@@ -38,6 +38,12 @@ public class AppConfiguration
     public bool MinimizeToTray { get; set; } = false;
 
     /// <summary>
+    /// UI preferences and display settings
+    /// </summary>
+    [JsonPropertyName("uiSettings")]
+    public UISettings UISettings { get; set; } = new UISettings();
+
+    /// <summary>
     /// Gets the currently active snippet set
     /// </summary>
     /// <returns>The active SnippetSet, or null if not found</returns>

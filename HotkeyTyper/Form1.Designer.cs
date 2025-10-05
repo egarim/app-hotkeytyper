@@ -25,13 +25,14 @@ partial class Form1
         
         // Form properties
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(1000, 650);
-        MinimumSize = new Size(900, 600);
+        ClientSize = new Size(1100, 700);
+        MinimumSize = new Size(950, 650);
         Text = "Hotkey Typer";
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = true;
         FormBorderStyle = FormBorderStyle.Sizable;
-        Padding = new Padding(15);
+        Padding = new Padding(10);
+        BackColor = Color.White;
         
         // Create controls
         CreateControls();
@@ -52,13 +53,17 @@ partial class Form1
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Tab content
         mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Status bar
         
-        // Row 0: Tab header panel
-        var tabHeaderPanel = new Panel
+        // Row 0: Tab header panel with buttons
+        var tabHeaderPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            Height = 45,
-            Padding = new Padding(0, 0, 0, 10)
+            ColumnCount = 2,
+            RowCount = 1,
+            Padding = new Padding(0, 0, 0, 5),
+            Height = 40
         };
+        tabHeaderPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F)); // TabControl
+        tabHeaderPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Buttons
         
         // Tab control
         tabControlSets = new TabControl
@@ -69,54 +74,71 @@ partial class Form1
         };
         tabControlSets.SelectedIndexChanged += TabControlSets_SelectedIndexChanged;
         
-        // Buttons panel (positioned over tab control)
+        // Buttons panel
         var tabButtonsPanel = new FlowLayoutPanel
         {
-            Dock = DockStyle.Right,
+            Dock = DockStyle.Fill,
             AutoSize = true,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            Padding = new Padding(5, 8, 5, 0)
+            Padding = new Padding(10, 5, 5, 0),
+            Margin = new Padding(0)
         };
         
         btnNewSet = new Button
         {
-            Text = "➕",
-            Width = 35,
+            Text = "+ New Set",
+            AutoSize = true,
             Height = 28,
-            Font = new Font("Segoe UI", 10F),
+            Font = new Font("Segoe UI", 9F),
             FlatStyle = FlatStyle.System,
-            Margin = new Padding(0, 0, 3, 0)
+            Margin = new Padding(0, 0, 5, 0),
+            Padding = new Padding(10, 3, 10, 3)
         };
         btnNewSet.Click += BtnNewSet_Click;
         
         btnRenameSet = new Button
         {
-            Text = "✏️",
-            Width = 35,
+            Text = "Rename",
+            AutoSize = true,
             Height = 28,
-            Font = new Font("Segoe UI", 10F),
+            Font = new Font("Segoe UI", 9F),
             FlatStyle = FlatStyle.System,
-            Margin = new Padding(0, 0, 3, 0),
+            Margin = new Padding(0, 0, 5, 0),
+            Padding = new Padding(10, 3, 10, 3),
             Enabled = false
         };
         btnRenameSet.Click += BtnRenameSet_Click;
         
         btnDeleteSet = new Button
         {
-            Text = "🗑️",
-            Width = 35,
+            Text = "Delete",
+            AutoSize = true,
             Height = 28,
-            Font = new Font("Segoe UI", 10F),
+            Font = new Font("Segoe UI", 9F),
             FlatStyle = FlatStyle.System,
+            Margin = new Padding(0, 0, 15, 0),
+            Padding = new Padding(10, 3, 10, 3),
             Enabled = false
         };
         btnDeleteSet.Click += BtnDeleteSet_Click;
+
+        btnSettings = new Button
+        {
+            Text = "⚙ Settings",
+            AutoSize = true,
+            Height = 28,
+            Font = new Font("Segoe UI", 9F),
+            FlatStyle = FlatStyle.System,
+            Margin = new Padding(0, 0, 5, 0),
+            Padding = new Padding(10, 3, 10, 3)
+        };
+        btnSettings.Click += BtnSettings_Click;
         
-        tabButtonsPanel.Controls.AddRange(new Control[] { btnNewSet, btnRenameSet, btnDeleteSet });
+        tabButtonsPanel.Controls.AddRange(new Control[] { btnNewSet, btnRenameSet, btnDeleteSet, btnSettings });
         
-        tabHeaderPanel.Controls.Add(tabControlSets);
-        tabHeaderPanel.Controls.Add(tabButtonsPanel);
+        tabHeaderPanel.Controls.Add(tabControlSets, 0, 0);
+        tabHeaderPanel.Controls.Add(tabButtonsPanel, 1, 0);
         
         // Row 2: Status bar
         lblStatus = new Label
@@ -142,16 +164,17 @@ partial class Form1
         btnMinimize = new Button
         {
             Name = "btnMinimize",
-            Text = "Minimize to Tray",
+            Text = "📌 Minimize to Tray",
             Dock = DockStyle.Right,
             AutoSize = true,
             Font = new Font("Segoe UI", 9F),
-            Padding = new Padding(15, 5, 15, 5)
+            Padding = new Padding(15, 5, 15, 5),
+            FlatStyle = FlatStyle.System
         };
         btnMinimize.Click += BtnMinimize_Click;
         
-        statusPanel.Controls.Add(lblStatus);
         statusPanel.Controls.Add(btnMinimize);
+        statusPanel.Controls.Add(lblStatus);
         
         mainLayout.Controls.Add(tabHeaderPanel, 0, 0);
         mainLayout.Controls.Add(tabControlSets, 0, 1);
@@ -166,7 +189,8 @@ partial class Form1
         {
             Text = set.Name,
             Tag = set,
-            Padding = new Padding(15)
+            Padding = new Padding(12),
+            BackColor = Color.White
         };
         
         // Main layout for tab content
@@ -179,15 +203,15 @@ partial class Form1
         };
         
         tabLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Header
-        tabLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 40F)); // Snippets list
-        tabLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 60F)); // Editor
+        tabLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F)); // Snippets list (reduced)
+        tabLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Editor (takes remaining space)
         
         // Row 0: Snippets header + New button
         var snippetsHeaderPanel = new Panel
         {
             Dock = DockStyle.Fill,
-            Height = 40,
-            Padding = new Padding(0, 0, 0, 10)
+            Height = 45,
+            Padding = new Padding(0, 0, 0, 12)
         };
         
         var lblSnippetsHeader = new Label
@@ -196,16 +220,18 @@ partial class Form1
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             Dock = DockStyle.Left,
             AutoSize = true,
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.FromArgb(51, 51, 51)
         };
         
         var btnNewSnippet = new Button
         {
-            Text = "➕ Add New Snippet",
+            Text = "+ Add Snippet",
             Dock = DockStyle.Right,
             AutoSize = true,
             Font = new Font("Segoe UI", 9F),
-            Padding = new Padding(15, 5, 15, 5),
+            Padding = new Padding(20, 8, 20, 8),
+            FlatStyle = FlatStyle.System,
             Tag = set
         };
         btnNewSnippet.Click += BtnNewSnippet_Click;
@@ -222,12 +248,14 @@ partial class Form1
             FullRowSelect = true,
             GridLines = true,
             Font = new Font("Segoe UI", 9.5F),
+            HeaderStyle = ColumnHeaderStyle.Nonclickable,
             Tag = set
         };
         
         listViewSnippets.Columns.Add("Hotkey", 100);
-        listViewSnippets.Columns.Add("Name", 300);
-        listViewSnippets.Columns.Add("Preview", 400);
+        listViewSnippets.Columns.Add("Name", 200);
+        listViewSnippets.Columns.Add("Speed", 80);
+        listViewSnippets.Columns.Add("Preview", -2); // -2 = auto-fill remaining space
         listViewSnippets.SelectedIndexChanged += ListViewSnippets_SelectedIndexChanged;
         
         // Populate snippets
@@ -235,6 +263,7 @@ partial class Form1
         {
             var item = new ListViewItem(snippet.GetHotkeyDisplay());
             item.SubItems.Add(snippet.Name);
+            item.SubItems.Add(GetSpeedText(snippet.TypingSpeed));
             item.SubItems.Add(snippet.GetContentPreview());
             item.Tag = snippet;
             listViewSnippets.Items.Add(item);
@@ -257,7 +286,8 @@ partial class Form1
         var editorPanel = new Panel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(0, 15, 0, 0)
+            Padding = new Padding(0, 10, 0, 0),
+            AutoScroll = true // Enable scrolling for small screens
         };
         
         var editorLayout = new TableLayoutPanel
@@ -265,8 +295,8 @@ partial class Form1
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 8,
-            Padding = new Padding(10),
-            BackColor = Color.FromArgb(245, 245, 245)
+            Padding = new Padding(15, 12, 15, 12), // Increased horizontal padding
+            BackColor = Color.FromArgb(250, 250, 250)
         };
         
         editorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Header
@@ -282,7 +312,8 @@ partial class Form1
         var lblEditorHeader = new Label
         {
             Text = "Snippet Editor",
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(51, 51, 51),
             AutoSize = true,
             Dock = DockStyle.Top,
             Margin = new Padding(0, 0, 0, 10)
@@ -295,9 +326,9 @@ partial class Form1
             ColumnCount = 2,
             RowCount = 1,
             AutoSize = true,
-            Margin = new Padding(0, 0, 0, 10)
+            Margin = new Padding(0, 0, 0, 8)
         };
-        namePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        namePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Auto-size for label
         namePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         
         var lblName = new Label
@@ -306,7 +337,8 @@ partial class Form1
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             AutoSize = true,
             TextAlign = ContentAlignment.MiddleLeft,
-            Margin = new Padding(0, 5, 10, 0)
+            Margin = new Padding(0, 6, 10, 0),
+            MinimumSize = new Size(60, 0) // Ensure minimum width but allow expansion
         };
         
         txtSnippetName = new TextBox
@@ -314,13 +346,24 @@ partial class Form1
             Name = "txtSnippetName",
             Dock = DockStyle.Fill,
             Font = new Font("Segoe UI", 9.5F),
-            Enabled = false
+            Enabled = false,
+            Height = 26
         };
         
         namePanel.Controls.Add(lblName, 0, 0);
         namePanel.Controls.Add(txtSnippetName, 1, 0);
         
         // Row 2: Content
+        var contentPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = new Padding(0, 0, 0, 8)
+        };
+        contentPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Label
+        contentPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Textbox
+        
         var contentLabel = new Label
         {
             Text = "Content:",
@@ -336,17 +379,13 @@ partial class Form1
             Multiline = true,
             ScrollBars = ScrollBars.Vertical,
             Dock = DockStyle.Fill,
-            Font = new Font("Consolas", 9.5F),
+            Font = new Font("Consolas", 10F),
             Enabled = false,
-            Margin = new Padding(0, 0, 0, 10)
+            BorderStyle = BorderStyle.FixedSingle
         };
         
-        var contentPanel = new Panel
-        {
-            Dock = DockStyle.Fill
-        };
-        contentPanel.Controls.Add(txtPredefinedText);
-        contentPanel.Controls.Add(contentLabel);
+        contentPanel.Controls.Add(contentLabel, 0, 0);
+        contentPanel.Controls.Add(txtPredefinedText, 0, 1);
         
         // Row 3: Typing speed
         var speedPanel = new TableLayoutPanel
@@ -355,7 +394,7 @@ partial class Form1
             ColumnCount = 3,
             RowCount = 1,
             AutoSize = true,
-            Margin = new Padding(0, 0, 0, 10)
+            Margin = new Padding(0, 0, 0, 6)
         };
         speedPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         speedPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -402,7 +441,7 @@ partial class Form1
             FlowDirection = FlowDirection.LeftToRight,
             AutoSize = true,
             WrapContents = false,
-            Margin = new Padding(0, 0, 0, 10)
+            Margin = new Padding(0, 0, 0, 6)
         };
         
         chkHasCode = new CheckBox
@@ -433,7 +472,7 @@ partial class Form1
             ColumnCount = 2,
             RowCount = 1,
             AutoSize = true,
-            Margin = new Padding(0, 0, 0, 15),
+            Margin = new Padding(0, 0, 0, 8),
             Visible = false
         };
         filePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -472,27 +511,32 @@ partial class Form1
             FlowDirection = FlowDirection.LeftToRight,
             AutoSize = true,
             WrapContents = false,
-            Margin = new Padding(0, 0, 0, 10)
+            Margin = new Padding(0, 3, 0, 8)
         };
         
         btnSaveSnippet = new Button
         {
             Text = "💾 Save Changes",
             AutoSize = true,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            Padding = new Padding(20, 8, 20, 8),
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Padding = new Padding(25, 10, 25, 10),
             Margin = new Padding(0, 0, 10, 0),
+            BackColor = Color.FromArgb(0, 120, 215),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
             Enabled = false
         };
+        btnSaveSnippet.FlatAppearance.BorderSize = 0;
         btnSaveSnippet.Click += BtnSaveSnippet_Click;
         
         btnDeleteSnippet = new Button
         {
-            Text = "🗑️ Delete This Snippet",
+            Text = "Delete This Snippet",
             AutoSize = true,
             Font = new Font("Segoe UI", 9F),
-            Padding = new Padding(15, 8, 15, 8),
+            Padding = new Padding(20, 10, 20, 10),
             Margin = new Padding(0, 0, 10, 0),
+            FlatStyle = FlatStyle.System,
             Enabled = false
         };
         btnDeleteSnippet.Click += BtnDeleteSnippet_Click;
@@ -502,7 +546,8 @@ partial class Form1
             Text = "Stop Typing",
             AutoSize = true,
             Font = new Font("Segoe UI", 9F),
-            Padding = new Padding(15, 8, 15, 8),
+            Padding = new Padding(20, 10, 20, 10),
+            FlatStyle = FlatStyle.System,
             Enabled = false
         };
         btnStop.Click += BtnStop_Click;
@@ -538,6 +583,7 @@ partial class Form1
     private Button btnNewSet;
     private Button btnRenameSet;
     private Button btnDeleteSet;
+    private Button btnSettings;
     private Button btnMinimize;
     private Label lblStatus;
     

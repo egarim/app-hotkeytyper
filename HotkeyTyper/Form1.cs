@@ -11,7 +11,7 @@ public partial class Form1 : Form
     private const int MOD_CONTROL = 0x0002;
     private const int MOD_SHIFT = 0x0004;
     private const int WM_HOTKEY = 0x0312;
-    private const int HOTKEY_ID = 1;
+    private const int HOTKEY_ID_BASE = 1000; // Base ID for hotkeys 1-9
     
     // NEW: Settings Manager and Configuration
     private SettingsManager settingsManager;
@@ -133,6 +133,9 @@ public partial class Form1 : Form
     
     private void UpdateUIFromSettings()
     {
+        // Apply UI scale settings
+        ApplyUIScale(appConfig.UISettings);
+        
         // Update text box with loaded predefined text
         if (txtPredefinedText != null)
         {
@@ -280,16 +283,58 @@ public partial class Form1 : Form
     
     protected override void WndProc(ref Message m)
     {
-        if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == HOTKEY_ID)
+        if (m.Msg == WM_HOTKEY)
         {
-            // Hotkey was pressed, begin typing (if not already typing)
-            StartTyping();
+            int hotkeyId = m.WParam.ToInt32();
+            
+            // Check if it's one of our hotkeys (1000-1008 for CTRL+SHIFT+1 through CTRL+SHIFT+9)
+            if (hotkeyId >= HOTKEY_ID_BASE && hotkeyId < HOTKEY_ID_BASE + 9)
+            {
+                int hotkeyNumber = hotkeyId - HOTKEY_ID_BASE + 1; // Convert to 1-9
+                StartTypingForHotkey(hotkeyNumber);
+            }
         }
         
         base.WndProc(ref m);
     }
     
-    private void StartTyping()
+    private void StartTypingForHotkey(int hotkeyNumber)
+    {
+        // Ignore if already typing
+        if (typingCts != null)
+        {
+            return;
+        }
+        
+        // Get the active set
+        var activeSet = appConfig.GetActiveSet();
+        if (activeSet == null)
+        {
+            if (lblStatus != null)
+            {
+                lblStatus.Text = "Status: No active snippet set";
+                lblStatus.ForeColor = Color.Red;
+            }
+            return;
+        }
+        
+        // Find the snippet with this hotkey number
+        var snippet = activeSet.GetSnippetByHotkey(hotkeyNumber);
+        if (snippet == null)
+        {
+            if (lblStatus != null)
+            {
+                lblStatus.Text = $"Status: No snippet assigned to CTRL+SHIFT+{hotkeyNumber}";
+                lblStatus.ForeColor = Color.Orange;
+            }
+            return;
+        }
+        
+        // Start typing with this snippet
+        StartTypingWithSnippet(snippet);
+    }
+    
+    private void StartTypingWithSnippet(Snippet snippet)
     {
         // Ignore if already typing
         if (typingCts != null)
@@ -300,12 +345,14 @@ public partial class Form1 : Form
         typingCts = new CancellationTokenSource();
         var token = typingCts.Token;
 
-        // Determine content to type (just-in-time). Do NOT overwrite the user's textbox content when using file mode.
+        // Determine content to type from snippet
         string? contentToType;
-        if (fileSourceMode)
+        
+        if (snippet.UseFile && !string.IsNullOrWhiteSpace(snippet.FilePath))
         {
+            // Load content from file
             bool truncated;
-            contentToType = LoadFileContentForTyping(out truncated);
+            contentToType = LoadFileContent(snippet.FilePath, out truncated);
             if (contentToType == null)
             {
                 // Abort typing if file not available
@@ -313,7 +360,7 @@ public partial class Form1 : Form
                 typingCts = null;
                 if (lblStatus != null)
                 {
-                    lblStatus.Text = "Status: File not found";
+                    lblStatus.Text = $"Status: File not found: {snippet.FilePath}";
                     lblStatus.ForeColor = Color.Red;
                 }
                 return;
@@ -326,13 +373,14 @@ public partial class Form1 : Form
         }
         else
         {
-            contentToType = txtPredefinedText?.Text ?? predefinedText;
+            // Use snippet content
+            contentToType = snippet.Content;
         }
 
         // Update UI state
         if (lblStatus != null)
         {
-            lblStatus.Text = "Status: Typing in progress...";
+            lblStatus.Text = $"Status: Typing '{snippet.Name}' at speed {snippet.TypingSpeed}...";
             lblStatus.ForeColor = Color.DarkOrange;
         }
         if (btnStop != null)
@@ -340,11 +388,34 @@ public partial class Form1 : Form
             btnStop.Enabled = true;
         }
 
-        // Fire and forget task (safe because we manage CTS and UI context)
-        _ = TypePredefinedTextAsync(token, contentToType);
+        // Fire and forget task using snippet's speed and hasCode settings
+        _ = TypePredefinedTextAsync(token, contentToType, snippet.TypingSpeed, snippet.HasCode);
     }
-
-    private async Task TypePredefinedTextAsync(CancellationToken token, string content)
+    
+    private string? LoadFileContent(string filePath, out bool truncated)
+    {
+        truncated = false;
+        if (string.IsNullOrWhiteSpace(filePath)) return null;
+        try
+        {
+            if (!File.Exists(filePath)) return null;
+            string text = File.ReadAllText(filePath);
+            const int maxLen = 50000;
+            if (text.Length > maxLen)
+            {
+                text = text.Substring(0, maxLen);
+                truncated = true;
+            }
+            return text;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error reading file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return null;
+        }
+    }
+    
+    private async Task TypePredefinedTextAsync(CancellationToken token, string content, int speed, bool hasCode)
     {
         try
         {
@@ -364,7 +435,8 @@ public partial class Form1 : Form
             }
             
             // Calculate delay based on typing speed (1=slowest, 10=fastest)
-            int baseDelay = 310 - (typingSpeed * 30); // Base delay calculation
+            // Use the speed parameter, not the instance variable
+            int baseDelay = 310 - (speed * 30); // Base delay calculation
             int variation = Math.Max(10, baseDelay / 3); // Variation amount
             Random random = new Random();
             
@@ -375,7 +447,7 @@ public partial class Form1 : Form
                 char c = content[index];
 
                 // Contextual pause heuristic: if previous char was a boundary and current is a space, pause before continuing
-                if (prev != '\0' && c == ' ' && ContextBoundaryChars.Contains(prev) && typingSpeed >= 7)
+                if (prev != '\0' && c == ' ' && ContextBoundaryChars.Contains(prev) && speed >= 7)
                 {
                     try { await Task.Delay(ContextualPauseMs, token); } catch (OperationCanceledException) { break; }
                 }
@@ -394,7 +466,7 @@ public partial class Form1 : Form
                 }
 
                 int delay = Math.Max(20, random.Next(Math.Max(10, baseDelay - variation), baseDelay + variation));
-                if (typingSpeed >= 8 && delay < MinFastDelayMs)
+                if (speed >= 8 && delay < MinFastDelayMs)
                 {
                     delay = MinFastDelayMs; // enforce safety margin
                 }
@@ -506,57 +578,39 @@ public partial class Form1 : Form
 
     private void ChkHasCode_CheckedChanged(object? sender, EventArgs e)
     {
-        if (sender is CheckBox cb)
+        if (chkHasCode == null || currentSnippet == null) return;
+        
+        // Auto-save HasCode to current snippet
+        currentSnippet.HasCode = chkHasCode.Checked;
+        currentSnippet.UpdateModifiedDate();
+        settingsManager.SaveSettings(appConfig);
+        
+        // Update speed indicator label
+        if (lblSpeedIndicator != null && sliderTypingSpeed != null)
         {
-            hasCodeMode = cb.Checked;
-            if (hasCodeMode)
-            {
-                // entering code mode: remember current non-code speed
-                lastNonCodeSpeed = typingSpeed;
-                if (typingSpeed > 8 && sliderTypingSpeed != null)
-                {
-                    typingSpeed = 8;
-                    sliderTypingSpeed.Value = 8;
-                    NotifyClamped();
-                }
-            }
-            else
-            {
-                // leaving code mode: restore last non-code speed
-                typingSpeed = Math.Min(Math.Max(lastNonCodeSpeed, 1), 10);
-                if (sliderTypingSpeed != null)
-                {
-                    sliderTypingSpeed.Value = typingSpeed;
-                }
-            }
-            if (sliderTypingSpeed is LimitedTrackBar lt)
-            {
-                lt.SoftMax = hasCodeMode ? 8 : null;
-                sliderTypingSpeed.Invalidate();
-            }
-            if (lblSpeedIndicator != null)
-            {
-                lblSpeedIndicator.Text = GetSpeedText(typingSpeed) + (hasCodeMode ? " (code mode)" : string.Empty);
-            }
-            UpdateTooltips();
-            SaveSettings();
+            lblSpeedIndicator.Text = GetSpeedText(sliderTypingSpeed.Value) + (chkHasCode.Checked ? " (code mode)" : string.Empty);
         }
     }
 
     private void ChkUseFile_CheckedChanged(object? sender, EventArgs e)
     {
-        if (sender is CheckBox cb)
-        {
-            fileSourceMode = cb.Checked;
-            if (txtFilePath != null) txtFilePath.Enabled = fileSourceMode;
-            if (btnBrowseFile != null) btnBrowseFile.Enabled = fileSourceMode;
-            if (txtPredefinedText != null) txtPredefinedText.Enabled = !fileSourceMode;
-            SaveSettings();
-        }
+        if (chkUseFile == null || currentSnippet == null) return;
+        
+        // Auto-save UseFile to current snippet
+        currentSnippet.UseFile = chkUseFile.Checked;
+        currentSnippet.UpdateModifiedDate();
+        settingsManager.SaveSettings(appConfig);
+        
+        // Enable/disable file path controls
+        if (txtFilePath != null) txtFilePath.Enabled = chkUseFile.Checked;
+        if (btnBrowseFile != null) btnBrowseFile.Enabled = chkUseFile.Checked;
+        if (txtPredefinedText != null) txtPredefinedText.Enabled = !chkUseFile.Checked;
     }
 
     private void BtnBrowseFile_Click(object? sender, EventArgs e)
     {
+        if (currentSnippet == null) return;
+        
         using var ofd = new OpenFileDialog
         {
             Title = "Select text or markdown file",
@@ -566,9 +620,12 @@ public partial class Form1 : Form
         };
         if (ofd.ShowDialog() == DialogResult.OK)
         {
-            fileSourcePath = ofd.FileName;
-            if (txtFilePath != null) txtFilePath.Text = fileSourcePath;
-            SaveSettings();
+            // Auto-save file path to current snippet
+            currentSnippet.FilePath = ofd.FileName;
+            currentSnippet.UpdateModifiedDate();
+            settingsManager.SaveSettings(appConfig);
+            
+            if (txtFilePath != null) txtFilePath.Text = ofd.FileName;
         }
     }
 
@@ -662,6 +719,14 @@ public partial class Form1 : Form
         
         int speed = sliderTypingSpeed.Value;
         lblSpeedIndicator.Text = GetSpeedText(speed);
+        
+        // Auto-save speed to current snippet (so hotkeys use the updated speed immediately)
+        if (currentSnippet != null)
+        {
+            currentSnippet.TypingSpeed = speed;
+            currentSnippet.UpdateModifiedDate();
+            settingsManager.SaveSettings(appConfig);
+        }
     }
     
     // ===== SET MANAGEMENT EVENT HANDLERS =====
@@ -743,6 +808,28 @@ public partial class Form1 : Form
             appConfig.Sets.Remove(selectedSet);
             settingsManager.SaveSettings(appConfig);
             tabControlSets.TabPages.Remove(tabControlSets.SelectedTab);
+        }
+    }
+
+    private void BtnSettings_Click(object? sender, EventArgs e)
+    {
+        var settingsDialog = new SettingsDialog(appConfig.UISettings);
+        if (settingsDialog.ShowDialog(this) == DialogResult.OK && settingsDialog.Applied)
+        {
+            // Save settings
+            settingsManager.SaveSettings(appConfig);
+            
+            // Show message about restart
+            var result = MessageBox.Show(
+                "Settings have been saved. The application needs to restart to apply the changes.\n\nRestart now?",
+                "Settings Saved",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Information);
+                
+            if (result == DialogResult.Yes)
+            {
+                Application.Restart();
+            }
         }
     }
     
@@ -916,8 +1003,11 @@ public partial class Form1 : Form
     
     protected override void Dispose(bool disposing)
     {
-        // Unregister hotkey when form is disposed
-        UnregisterHotKey(this.Handle, HOTKEY_ID);
+        // Unregister all hotkeys when form is disposed
+        for (int i = 0; i < 9; i++)
+        {
+            UnregisterHotKey(this.Handle, HOTKEY_ID_BASE + i);
+        }
         
         // Clean up system tray
         if (trayIcon != null)
@@ -950,31 +1040,109 @@ public partial class Form1 : Form
     }
 
     /// <summary>
-    /// Attempt to register CTRL+SHIFT+1 as a global hotkey. If the hotkey is already registered
-    /// (stale from a previous handle) we first try to unregister. Any failure is surfaced in the
-    /// status label and via a tray balloon tip for visibility.
+    /// Attempt to register CTRL+SHIFT+1 through CTRL+SHIFT+9 as global hotkeys.
+    /// If hotkeys are already registered (stale from a previous handle) we first try to unregister.
+    /// Any failure is surfaced in the status label and via a tray balloon tip for visibility.
     /// </summary>
     private void TryRegisterGlobalHotkey()
     {
-        // Best-effort: in case a previous registration existed for a prior handle instance.
-        UnregisterHotKey(this.Handle, HOTKEY_ID);
+        // Unregister any existing registrations from previous handle
+        for (int i = 0; i < 9; i++)
+        {
+            UnregisterHotKey(this.Handle, HOTKEY_ID_BASE + i);
+        }
 
-        if (!RegisterHotKey(this.Handle, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, (int)Keys.D1))
+        // Register all 9 hotkeys (CTRL+SHIFT+1 through CTRL+SHIFT+9)
+        int successCount = 0;
+        List<int> failedHotkeys = new List<int>();
+        
+        for (int i = 0; i < 9; i++)
+        {
+            int hotkeyNumber = i + 1; // 1-9
+            int hotkeyId = HOTKEY_ID_BASE + i;
+            Keys key = (Keys)((int)Keys.D1 + i); // D1 through D9
+            
+            if (RegisterHotKey(this.Handle, hotkeyId, MOD_CONTROL | MOD_SHIFT, (int)key))
+            {
+                successCount++;
+            }
+            else
+            {
+                failedHotkeys.Add(hotkeyNumber);
+            }
+        }
+
+        // Update status based on results
+        if (successCount == 9)
         {
             if (lblStatus != null)
             {
-                lblStatus.Text = "Status: Failed to register global hotkey";
-                lblStatus.ForeColor = Color.Red;
+                lblStatus.Text = "Status: All hotkeys (CTRL+SHIFT+1-9) registered";
+                lblStatus.ForeColor = Color.Green;
             }
-            trayIcon?.ShowBalloonTip(3000, "Hotkey Typer", "Failed to register global hotkey CTRL+SHIFT+1. It may be in use by another application.", ToolTipIcon.Error);
+        }
+        else if (successCount > 0)
+        {
+            if (lblStatus != null)
+            {
+                lblStatus.Text = $"Status: {successCount}/9 hotkeys registered. Failed: {string.Join(", ", failedHotkeys)}";
+                lblStatus.ForeColor = Color.Orange;
+            }
+            trayIcon?.ShowBalloonTip(3000, "Hotkey Typer", 
+                $"Some hotkeys failed to register: CTRL+SHIFT+{string.Join(", ", failedHotkeys)}. They may be in use by another application.", 
+                ToolTipIcon.Warning);
         }
         else
         {
-            if (lblStatus != null && lblStatus.Text.StartsWith("Status: Failed", StringComparison.OrdinalIgnoreCase))
+            if (lblStatus != null)
             {
-                lblStatus.Text = "Status: Hotkey CTRL+SHIFT+1 is active";
-                lblStatus.ForeColor = Color.Green;
+                lblStatus.Text = "Status: Failed to register any hotkeys";
+                lblStatus.ForeColor = Color.Red;
             }
+            trayIcon?.ShowBalloonTip(3000, "Hotkey Typer", "Failed to register global hotkeys. They may be in use by another application.", ToolTipIcon.Error);
+        }
+    }
+
+    // ===== UI SCALE METHODS =====
+    
+    private void ApplyUIScale(UISettings uiSettings)
+    {
+        float scaleFactor = uiSettings.Scale switch
+        {
+            UIScale.Small => 0.90f,
+            UIScale.Large => 1.10f,
+            _ => 1.0f
+        };
+
+        // Apply to all controls recursively
+        ApplyFontScaleToControl(this, uiSettings.BaseFontSize, scaleFactor);
+        
+        // Apply content font size specifically to content textbox
+        if (txtPredefinedText != null)
+        {
+            txtPredefinedText.Font = new Font("Consolas", uiSettings.ContentFontSize * scaleFactor);
+        }
+    }
+
+    private void ApplyFontScaleToControl(Control control, int baseFontSize, float scaleFactor)
+    {
+        // Skip content textbox - it has its own setting
+        if (control == txtPredefinedText) return;
+
+        // Apply font size to this control
+        if (control.Font != null)
+        {
+            var currentFont = control.Font;
+            var newSize = baseFontSize * scaleFactor;
+            
+            // Preserve font style
+            control.Font = new Font(currentFont.FontFamily, newSize, currentFont.Style);
+        }
+
+        // Recursively apply to children
+        foreach (Control child in control.Controls)
+        {
+            ApplyFontScaleToControl(child, baseFontSize, scaleFactor);
         }
     }
 }
