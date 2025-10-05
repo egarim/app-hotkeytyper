@@ -10,6 +10,7 @@ public class SettingsDialog : Form
     private ComboBox cmbUIScale;
     private NumericUpDown numBaseFontSize;
     private NumericUpDown numContentFontSize;
+    private CheckBox chkAutoSave;
     private Button btnOK;
     private Button btnCancel;
     private Button btnApply;
@@ -23,7 +24,8 @@ public class SettingsDialog : Form
         {
             Scale = currentSettings.Scale,
             BaseFontSize = currentSettings.BaseFontSize,
-            ContentFontSize = currentSettings.ContentFontSize
+            ContentFontSize = currentSettings.ContentFontSize,
+            AutoSave = currentSettings.AutoSave
         };
 
         InitializeComponent();
@@ -64,11 +66,12 @@ public class SettingsDialog : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(15)
         };
         settingsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160F));
         settingsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        settingsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
         settingsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
         settingsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
         settingsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
@@ -134,12 +137,33 @@ public class SettingsDialog : Form
             Margin = new Padding(0)
         };
 
+        // Auto Save
+        var lblAutoSave = new Label
+        {
+            Text = "Auto Save:",
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Font = new Font("Segoe UI", 9F),
+            Margin = new Padding(0, 0, 10, 0)
+        };
+
+        chkAutoSave = new CheckBox
+        {
+            Text = "Automatically save changes without clicking Save button",
+            Font = new Font("Segoe UI", 9F),
+            Anchor = AnchorStyles.Left,
+            AutoSize = true,
+            Margin = new Padding(0)
+        };
+
         settingsLayout.Controls.Add(lblScale, 0, 0);
         settingsLayout.Controls.Add(cmbUIScale, 1, 0);
         settingsLayout.Controls.Add(lblBaseFontSize, 0, 1);
         settingsLayout.Controls.Add(numBaseFontSize, 1, 1);
         settingsLayout.Controls.Add(lblContentFontSize, 0, 2);
         settingsLayout.Controls.Add(numContentFontSize, 1, 2);
+        settingsLayout.Controls.Add(lblAutoSave, 0, 3);
+        settingsLayout.Controls.Add(chkAutoSave, 1, 3);
 
         settingsPanel.Controls.Add(settingsLayout);
 
@@ -197,6 +221,7 @@ public class SettingsDialog : Form
         cmbUIScale.SelectedIndex = (int)UISettings.Scale;
         numBaseFontSize.Value = UISettings.BaseFontSize;
         numContentFontSize.Value = UISettings.ContentFontSize;
+        chkAutoSave.Checked = UISettings.AutoSave;
     }
 
     private void SaveSettings()
@@ -204,6 +229,7 @@ public class SettingsDialog : Form
         UISettings.Scale = (UIScale)cmbUIScale.SelectedIndex;
         UISettings.BaseFontSize = (int)numBaseFontSize.Value;
         UISettings.ContentFontSize = (int)numContentFontSize.Value;
+        UISettings.AutoSave = chkAutoSave.Checked;
     }
 
     private void BtnApply_Click(object? sender, EventArgs e)

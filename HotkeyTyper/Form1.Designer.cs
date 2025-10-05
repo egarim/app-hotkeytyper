@@ -424,6 +424,7 @@ partial class Form1
             Enabled = false,
             Height = 26
         };
+        txtSnippetName.TextChanged += TxtSnippetName_TextChanged;
         
         namePanel.Controls.Add(lblName, 0, 0);
         namePanel.Controls.Add(txtSnippetName, 1, 0);
@@ -458,6 +459,7 @@ partial class Form1
             Enabled = false,
             BorderStyle = BorderStyle.FixedSingle
         };
+        txtPredefinedText.TextChanged += TxtPredefinedText_TextChanged;
         
         contentPanel.Controls.Add(contentLabel, 0, 0);
         contentPanel.Controls.Add(txtPredefinedText, 0, 1);
@@ -562,6 +564,7 @@ partial class Form1
             Margin = new Padding(0, 0, 8, 0), // Reduced from 10
             Enabled = false
         };
+        txtFilePath.TextChanged += TxtFilePath_TextChanged;
         
         btnBrowseFile = new Button
         {

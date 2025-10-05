@@ -41,6 +41,9 @@ public partial class Form1 : Form
     private bool fileSourceMode = false;
     private string fileSourcePath = string.Empty;
     
+    // Flag to prevent auto-save during snippet loading
+    private bool isLoadingSnippet = false;
+    
     // Reliability heuristics for high-speed typing
     private const int MinFastDelayMs = 35; // Minimum delay enforced when speed >= 8
     private const int ContextualPauseMs = 140; // Extra pause after space following certain boundary chars
@@ -580,31 +583,27 @@ public partial class Form1 : Form
     {
         if (chkHasCode == null || currentSnippet == null) return;
         
-        // Auto-save HasCode to current snippet
-        currentSnippet.HasCode = chkHasCode.Checked;
-        currentSnippet.UpdateModifiedDate();
-        settingsManager.SaveSettings(appConfig);
-        
         // Update speed indicator label
         if (lblSpeedIndicator != null && sliderTypingSpeed != null)
         {
             lblSpeedIndicator.Text = GetSpeedText(sliderTypingSpeed.Value) + (chkHasCode.Checked ? " (code mode)" : string.Empty);
         }
+        
+        // Auto-save if enabled
+        AutoSaveCurrentSnippet();
     }
 
     private void ChkUseFile_CheckedChanged(object? sender, EventArgs e)
     {
         if (chkUseFile == null || currentSnippet == null) return;
         
-        // Auto-save UseFile to current snippet
-        currentSnippet.UseFile = chkUseFile.Checked;
-        currentSnippet.UpdateModifiedDate();
-        settingsManager.SaveSettings(appConfig);
-        
         // Enable/disable file path controls
         if (txtFilePath != null) txtFilePath.Enabled = chkUseFile.Checked;
         if (btnBrowseFile != null) btnBrowseFile.Enabled = chkUseFile.Checked;
         if (txtPredefinedText != null) txtPredefinedText.Enabled = !chkUseFile.Checked;
+        
+        // Auto-save if enabled
+        AutoSaveCurrentSnippet();
     }
 
     private void BtnBrowseFile_Click(object? sender, EventArgs e)
@@ -729,6 +728,43 @@ public partial class Form1 : Form
         }
     }
     
+    private void AutoSaveCurrentSnippet()
+    {
+        // Don't auto-save if disabled, no snippet selected, or currently loading a snippet
+        if (!appConfig.UISettings.AutoSave || currentSnippet == null || isLoadingSnippet) return;
+        
+        // Validate snippet name
+        if (string.IsNullOrWhiteSpace(txtSnippetName.Text)) return;
+        
+        // Update snippet from editor
+        currentSnippet.Name = txtSnippetName.Text.Trim();
+        currentSnippet.Content = txtPredefinedText.Text;
+        currentSnippet.TypingSpeed = sliderTypingSpeed.Value;
+        currentSnippet.HasCode = chkHasCode.Checked;
+        currentSnippet.UseFile = chkUseFile.Checked;
+        currentSnippet.FilePath = chkUseFile.Checked ? txtFilePath.Text : null;
+        
+        settingsManager.SaveSettings(appConfig);
+        
+        lblStatus.Text = $"Status: Auto-saved '{currentSnippet.Name}'";
+        lblStatus.ForeColor = Color.Green;
+    }
+    
+    private void TxtSnippetName_TextChanged(object? sender, EventArgs e)
+    {
+        AutoSaveCurrentSnippet();
+    }
+    
+    private void TxtPredefinedText_TextChanged(object? sender, EventArgs e)
+    {
+        AutoSaveCurrentSnippet();
+    }
+
+    private void TxtFilePath_TextChanged(object? sender, EventArgs e)
+    {
+        AutoSaveCurrentSnippet();
+    }
+    
     // ===== SET MANAGEMENT EVENT HANDLERS =====
     
     // ===== TAB CONTROL EVENT HANDLERS =====
@@ -816,20 +852,39 @@ public partial class Form1 : Form
         var settingsDialog = new SettingsDialog(appConfig.UISettings);
         if (settingsDialog.ShowDialog(this) == DialogResult.OK && settingsDialog.Applied)
         {
+            // Copy the modified settings back to appConfig
+            appConfig.UISettings.Scale = settingsDialog.UISettings.Scale;
+            appConfig.UISettings.BaseFontSize = settingsDialog.UISettings.BaseFontSize;
+            appConfig.UISettings.ContentFontSize = settingsDialog.UISettings.ContentFontSize;
+            appConfig.UISettings.AutoSave = settingsDialog.UISettings.AutoSave;
+            
             // Save settings
             settingsManager.SaveSettings(appConfig);
             
-            // Show message about restart
-            var result = MessageBox.Show(
-                "Settings have been saved. The application needs to restart to apply the changes.\n\nRestart now?",
-                "Settings Saved",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Information);
-                
-            if (result == DialogResult.Yes)
+            // Refresh editor controls to reflect auto-save setting immediately
+            EnableEditorControls(currentSnippet != null);
+            
+            // Apply UI scale changes
+            ApplyUIScale(appConfig.UISettings);
+            
+            // Show feedback about auto-save status
+            if (appConfig.UISettings.AutoSave)
             {
-                Application.Restart();
+                lblStatus.Text = "Status: Auto-save enabled - changes will be saved automatically";
+                lblStatus.ForeColor = Color.Green;
             }
+            else
+            {
+                lblStatus.Text = "Status: Auto-save disabled - use Save button to save changes";
+                lblStatus.ForeColor = Color.Blue;
+            }
+            
+            // Show message about restart for complete UI refresh (only if needed for fonts/scale)
+            MessageBox.Show(
+                "Settings have been saved and applied.\n\nNote: Some UI changes may require an application restart to fully take effect.",
+                "Settings Saved",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
     }
     
@@ -858,6 +913,9 @@ public partial class Form1 : Form
     {
         if (currentSnippet == null) return;
         
+        // Set flag to prevent auto-save during load
+        isLoadingSnippet = true;
+        
         txtSnippetName.Text = currentSnippet.Name;
         txtPredefinedText.Text = currentSnippet.Content;
         sliderTypingSpeed.Value = currentSnippet.TypingSpeed;
@@ -866,8 +924,20 @@ public partial class Form1 : Form
         txtFilePath.Text = currentSnippet.FilePath ?? "";
         lblHotkeyDisplay.Text = $"Hotkey: {currentSnippet.GetHotkeyDisplay()}";
         
-        lblStatus.Text = $"Status: Editing snippet '{currentSnippet.Name}'";
-        lblStatus.ForeColor = Color.Blue;
+        // Set status message based on auto-save mode
+        if (appConfig.UISettings.AutoSave)
+        {
+            lblStatus.Text = $"Status: Editing '{currentSnippet.Name}' (auto-save enabled)";
+            lblStatus.ForeColor = Color.Green;
+        }
+        else
+        {
+            lblStatus.Text = $"Status: Editing snippet '{currentSnippet.Name}'";
+            lblStatus.ForeColor = Color.Blue;
+        }
+        
+        // Clear flag after load is complete
+        isLoadingSnippet = false;
     }
     
     private void EnableEditorControls(bool enabled)
@@ -879,8 +949,21 @@ public partial class Form1 : Form
         chkUseFile.Enabled = enabled;
         txtFilePath.Enabled = enabled && chkUseFile.Checked;
         btnBrowseFile.Enabled = enabled && chkUseFile.Checked;
-        btnSaveSnippet.Enabled = enabled;
-        btnCancelSnippet.Enabled = enabled;
+        
+        // Handle auto-save mode
+        bool autoSaveEnabled = appConfig.UISettings.AutoSave;
+        if (autoSaveEnabled && enabled)
+        {
+            btnSaveSnippet.Enabled = false;
+            btnSaveSnippet.Text = "✓ Auto Save";
+        }
+        else
+        {
+            btnSaveSnippet.Enabled = enabled;
+            btnSaveSnippet.Text = "💾 Save";
+        }
+        
+        btnCancelSnippet.Enabled = enabled && !autoSaveEnabled; // No cancel needed in auto-save mode
         btnDeleteSnippet.Enabled = enabled;
     }
     
