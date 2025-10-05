@@ -880,13 +880,14 @@ public partial class Form1 : Form
         txtFilePath.Enabled = enabled && chkUseFile.Checked;
         btnBrowseFile.Enabled = enabled && chkUseFile.Checked;
         btnSaveSnippet.Enabled = enabled;
+        btnCancelSnippet.Enabled = enabled;
         btnDeleteSnippet.Enabled = enabled;
     }
     
     private void BtnNewSnippet_Click(object? sender, EventArgs e)
     {
-        if (sender is not Button button) return;
-        if (button.Tag is not SnippetSet targetSet) return;
+        // Get the currently selected tab's set
+        if (tabControlSets.SelectedTab?.Tag is not SnippetSet targetSet) return;
         
         var availableHotkeys = targetSet.GetAvailableHotkeys();
         if (availableHotkeys.Count == 0)
@@ -968,6 +969,17 @@ public partial class Form1 : Form
         
         lblStatus.Text = $"Status: Snippet '{currentSnippet.Name}' saved successfully";
         lblStatus.ForeColor = Color.Green;
+    }
+    
+    private void BtnCancelSnippet_Click(object? sender, EventArgs e)
+    {
+        // Reload the current snippet from saved settings to discard changes
+        if (currentSnippet != null)
+        {
+            LoadSnippetIntoEditor();
+            lblStatus.Text = "Status: Changes discarded";
+            lblStatus.ForeColor = Color.Orange;
+        }
     }
     
     private void RefreshActiveTab()

@@ -33,8 +33,9 @@ public class SettingsDialog : Form
     private void InitializeComponent()
     {
         this.Text = "Settings";
-        this.Size = new Size(480, 320);
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
+        this.Size = new Size(550, 400);
+        this.MinimumSize = new Size(450, 350);
+        this.FormBorderStyle = FormBorderStyle.Sizable;
         this.StartPosition = FormStartPosition.CenterParent;
         this.MaximizeBox = false;
         this.MinimizeBox = false;
@@ -64,29 +65,30 @@ public class SettingsDialog : Form
             Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = 3,
-            Padding = new Padding(10)
+            Padding = new Padding(15)
         };
-        settingsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
-        settingsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60F));
-        settingsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        settingsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        settingsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        settingsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160F));
+        settingsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        settingsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
+        settingsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
+        settingsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
 
         // UI Scale
         var lblScale = new Label
         {
             Text = "UI Scale:",
             AutoSize = true,
+            Anchor = AnchorStyles.Left,
             Font = new Font("Segoe UI", 9F),
-            Margin = new Padding(0, 8, 10, 15)
+            Margin = new Padding(0, 0, 10, 0)
         };
 
         cmbUIScale = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             Font = new Font("Segoe UI", 9F),
-            Dock = DockStyle.Top,
-            Margin = new Padding(0, 5, 0, 15)
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Margin = new Padding(0)
         };
         cmbUIScale.Items.AddRange(new object[] {
             "Small (90%) - For high DPI (150%+)",
@@ -99,8 +101,9 @@ public class SettingsDialog : Form
         {
             Text = "UI Font Size:",
             AutoSize = true,
+            Anchor = AnchorStyles.Left,
             Font = new Font("Segoe UI", 9F),
-            Margin = new Padding(0, 8, 10, 15)
+            Margin = new Padding(0, 0, 10, 0)
         };
 
         numBaseFontSize = new NumericUpDown
@@ -108,8 +111,8 @@ public class SettingsDialog : Form
             Minimum = 7,
             Maximum = 14,
             Font = new Font("Segoe UI", 9F),
-            Dock = DockStyle.Top,
-            Margin = new Padding(0, 5, 0, 15)
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Margin = new Padding(0)
         };
 
         // Content Font Size
@@ -117,8 +120,9 @@ public class SettingsDialog : Form
         {
             Text = "Content Font Size:",
             AutoSize = true,
+            Anchor = AnchorStyles.Left,
             Font = new Font("Segoe UI", 9F),
-            Margin = new Padding(0, 8, 10, 15)
+            Margin = new Padding(0, 0, 10, 0)
         };
 
         numContentFontSize = new NumericUpDown
@@ -126,8 +130,8 @@ public class SettingsDialog : Form
             Minimum = 8,
             Maximum = 16,
             Font = new Font("Segoe UI", 9F),
-            Dock = DockStyle.Top,
-            Margin = new Padding(0, 5, 0, 15)
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Margin = new Padding(0)
         };
 
         settingsLayout.Controls.Add(lblScale, 0, 0);
