@@ -835,7 +835,17 @@ public partial class Form1 : Form
                 Id = Guid.NewGuid().ToString(),
                 Name = setName,
                 Description = "",
-                Snippets = new List<Snippet>()
+                Snippets = new List<Snippet>
+                {
+                    new Snippet
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Name = "Sample Snippet",
+                        Content = "Hello, this is a sample snippet!\nEdit this to get started.",
+                        HotkeyNumber = 1,
+                        TypingSpeed = 5
+                    }
+                }
             };
             
             appConfig.Sets.Add(newSet);
