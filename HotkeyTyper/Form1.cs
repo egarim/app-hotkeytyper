@@ -898,6 +898,124 @@ public partial class Form1 : Form
         }
     }
 
+    private void BtnImport_Click(object? sender, EventArgs e)
+    {
+        using var ofd = new OpenFileDialog
+        {
+            Title = "Import Snippet Settings",
+            Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (ofd.ShowDialog() != DialogResult.OK) return;
+
+        try
+        {
+            var imported = settingsManager.ImportSettings(ofd.FileName);
+            if (imported == null)
+            {
+                MessageBox.Show("Failed to parse the selected file. Please ensure it is a valid HotkeyTyper settings JSON.",
+                    "Import Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Ask user how to import
+            var result = MessageBox.Show(
+                $"Found {imported.Sets.Count} snippet set(s) with {imported.GetTotalSnippetCount()} total snippet(s).\n\n" +
+                "• YES — Replace all current sets with imported sets\n" +
+                "• NO — Merge (add imported sets alongside existing ones)\n" +
+                "• Cancel — Abort import",
+                "Import Snippets",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Cancel) return;
+
+            if (result == DialogResult.Yes)
+            {
+                // Replace mode
+                appConfig.Sets = imported.Sets;
+                appConfig.ActiveSetId = imported.ActiveSetId;
+                appConfig.UISettings = imported.UISettings ?? appConfig.UISettings;
+            }
+            else
+            {
+                // Merge mode — add imported sets, skip duplicates by name
+                int added = 0;
+                int skipped = 0;
+                foreach (var set in imported.Sets)
+                {
+                    if (appConfig.IsSetNameTaken(set.Name))
+                    {
+                        skipped++;
+                        continue;
+                    }
+                    // Generate new IDs to avoid conflicts
+                    set.Id = Guid.NewGuid().ToString();
+                    foreach (var snippet in set.Snippets)
+                        snippet.Id = Guid.NewGuid().ToString();
+                    appConfig.Sets.Add(set);
+                    added++;
+                }
+
+                if (skipped > 0)
+                {
+                    MessageBox.Show($"Added {added} set(s). Skipped {skipped} set(s) with duplicate names.",
+                        "Import Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+
+            appConfig.EnsureValid();
+            settingsManager.SaveSettings(appConfig);
+
+            // Reload UI
+            currentSnippet = null;
+            currentSet = null;
+            LoadSetsIntoTabs();
+            EnableEditorControls(false);
+
+            lblStatus.Text = $"Status: Imported {imported.Sets.Count} set(s) from {Path.GetFileName(ofd.FileName)}";
+            lblStatus.ForeColor = Color.Green;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error importing settings: {ex.Message}",
+                "Import Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void BtnExport_Click(object? sender, EventArgs e)
+    {
+        using var sfd = new SaveFileDialog
+        {
+            Title = "Export Snippet Settings",
+            Filter = "JSON Files (*.json)|*.json",
+            DefaultExt = "json",
+            FileName = "hotkeytyper-settings.json"
+        };
+
+        if (sfd.ShowDialog() != DialogResult.OK) return;
+
+        try
+        {
+            if (settingsManager.ExportSettings(appConfig, sfd.FileName))
+            {
+                lblStatus.Text = $"Status: Exported {appConfig.Sets.Count} set(s) to {Path.GetFileName(sfd.FileName)}";
+                lblStatus.ForeColor = Color.Green;
+            }
+            else
+            {
+                MessageBox.Show("Export failed.", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error exporting settings: {ex.Message}",
+                "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     private void BtnSettings_Click(object? sender, EventArgs e)
     {
         var settingsDialog = new SettingsDialog(appConfig.UISettings);

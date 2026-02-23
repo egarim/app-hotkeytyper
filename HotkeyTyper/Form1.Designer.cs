@@ -132,6 +132,30 @@ partial class Form1
         };
         btnDeleteSet.Click += BtnDeleteSet_Click;
 
+        btnImport = new Button
+        {
+            Text = "📥 Import",
+            AutoSize = true,
+            MinimumSize = new Size(0, 30),
+            Font = new Font("Segoe UI", 9F),
+            FlatStyle = FlatStyle.System,
+            Margin = new Padding(0, 0, 4, 0),
+            Padding = new Padding(10, 4, 10, 4)
+        };
+        btnImport.Click += BtnImport_Click;
+
+        btnExport = new Button
+        {
+            Text = "📤 Export",
+            AutoSize = true,
+            MinimumSize = new Size(0, 30),
+            Font = new Font("Segoe UI", 9F),
+            FlatStyle = FlatStyle.System,
+            Margin = new Padding(0, 0, 12, 0),
+            Padding = new Padding(10, 4, 10, 4)
+        };
+        btnExport.Click += BtnExport_Click;
+
         btnSettings = new Button
         {
             Text = "⚙ Settings",
@@ -144,7 +168,7 @@ partial class Form1
         };
         btnSettings.Click += BtnSettings_Click;
         
-        tabButtonsPanel.Controls.AddRange(new Control[] { btnNewSet, btnRenameSet, btnDeleteSet, btnSettings });
+        tabButtonsPanel.Controls.AddRange(new Control[] { btnNewSet, btnRenameSet, btnDeleteSet, btnImport, btnExport, btnSettings });
         
         tabHeaderPanel.Controls.Add(tabControlSets, 0, 0);
         tabHeaderPanel.Controls.Add(spacerPanel, 1, 0); // Add spacer
@@ -634,6 +658,8 @@ partial class Form1
     private Button btnNewSet;
     private Button btnRenameSet;
     private Button btnDeleteSet;
+    private Button btnImport;
+    private Button btnExport;
     private Button btnSettings;
     private Button btnMinimize;
     private Label lblStatus;
